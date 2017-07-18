@@ -15,7 +15,6 @@ def test_array_set():
     x = arr_x.asnumpy()
     np.testing.assert_allclose(np.zeros(shape), x)
 
-
 def test_broadcast_to():
     ctx = ndarray.gpu(0)
     shape = (200, 300)
