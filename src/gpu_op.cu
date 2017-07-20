@@ -213,6 +213,37 @@ int DLGpuMatrixMultiply(const DLArrayHandle matA, bool transposeA,
 	/* TODO: Your code here */
 	// Hint: use cublas
 	// cublas assume matrix is column major
+	cublasHandle_t handle;
+	cublasStatus_t status = cublasCreate(&handle);
+	assert (status == CUBLAS_STATUS_SUCCESS);
+	cudaThreadSynchronize();
+	
+	assert(matA->ndim == 2);
+	assert(matB->ndim == 2);
+	assert(matC->ndim == 2);
+	int m = matC->shape[0];
+	int n = matC->shape[1];
+	int k = matA->shape[transposeA ? 0 : 1];
+	assert(matA->shape[transposeA ? 1 : 0] == m);
+	assert(matB->shape[transposeB ? 0 : 1] == n);
+	assert(matB->shape[transposeB ? 1 : 0] == k);
+	//printf("\nm %d n %d k %d\n", m, n, k);
+	// C = (A1)(B1) = (m * k) * (k * n) = m * n
+	
+	const float *matA_data = (const float *)matA->data;
+	const float *matB_data = (const float *)matB->data;
+	float *matC_data = (float *)matC->data;
+	const float alpha = 1.0, beta = 0.0;
+	
+	cublasOperation_t transa = transposeA ? CUBLAS_OP_T : CUBLAS_OP_N;
+	cublasOperation_t transb = transposeB ? CUBLAS_OP_T : CUBLAS_OP_N;
+	cublasSgemm(handle,
+				transb, transa, n, m, k,
+				&alpha,
+				matB_data, transb == CUBLAS_OP_T ? k : n,
+				matA_data, transa == CUBLAS_OP_T ? m : k,
+				&beta,
+				matC_data, n);
 	return 0;
 }
 
@@ -241,10 +272,36 @@ int DLGpuRelu(const DLArrayHandle input, DLArrayHandle output) {
 	return 0;
 }
 
+__global__ void relu_gradient(int n, const float *input, 
+									 const float *in_grad, float *output) {
+	
+	int idx = blockIdx.x * blockDim.x + threadIdx.x;
+	if (idx >= n) return;
+	output[idx] = input[idx] > 0 ? 1 : 0;
+	output[idx] *= in_grad[idx];
+}
+
 int DLGpuReluGradient(const DLArrayHandle input, const DLArrayHandle in_grad,
                       DLArrayHandle output) {
 	/* TODO: Your code here */
+	assert(input->ndim == 2);
+	assert(in_grad->ndim == 2);
+	assert(output->ndim == 2);
+	for(int i = 0; i < 2; ++i)
+		assert(input->shape[i] == in_grad->shape[i]),
+		assert(input->shape[i] == output->shape[i]);
 	
+	int nrow = input->shape[0];
+	int ncol = input->shape[1];
+	int n = nrow * ncol;
+	int threads = min(1024, n);
+	int blocks = (n + 1023) / 1024;
+	
+	const float *input_data = (const float *)input->data;
+	const float *in_grad_data = (const float *)in_grad->data;
+	float *output_data = (float *)output->data;
+	
+	relu_gradient<<<blocks, threads>>>(n, input_data, in_grad_data, output_data);
 	return 0;
 }
 
