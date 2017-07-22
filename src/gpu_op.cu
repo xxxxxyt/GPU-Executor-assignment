@@ -219,7 +219,7 @@ int DLGpuMatrixMultiply(const DLArrayHandle matA, bool transposeA,
     // cublas assume matrix is column major
     cublasHandle_t handle;
     cublasStatus_t status = cublasCreate(&handle);
-    assert (status == CUBLAS_STATUS_SUCCESS);
+    assert(status == CUBLAS_STATUS_SUCCESS);
     cudaThreadSynchronize();
     
     assert(matA->ndim == 2);
@@ -249,6 +249,7 @@ int DLGpuMatrixMultiply(const DLArrayHandle matA, bool transposeA,
                 matA_data, transa == CUBLAS_OP_T ? m : k,
                 &beta,
                 matC_data, n);
+    cudaThreadSynchronize();
     return 0;
 }
 
